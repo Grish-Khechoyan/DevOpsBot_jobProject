@@ -1,0 +1,60 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: devops_job_api
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: jobs
+      DB_USER: jobs_user
+      DB_PASSWORD: jobs_password
+      PORT: 8000
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8000"
+    networks:
+      - jobbot_net
+
+  db:
+    image: postgres:16-alpine
+    container_name: devops_job_db
+    environment:
+      POSTGRES_DB: jobs
+      POSTGRES_USER: jobs_user
+      POSTGRES_PASSWORD: jobs_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobs_user -d jobs"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - jobbot_net
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: devops_job_proxy
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - jobbot_net
+
+networks:
+  jobbot_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
